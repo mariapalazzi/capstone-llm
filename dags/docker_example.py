@@ -1,59 +1,69 @@
+import os
 from datetime import datetime, timedelta
+
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.models.param import Param
 from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.operators.empty import EmptyOperator
 
 default_args = {
     "owner": "airflow",
     "description": "Use of the DockerOperator",
     "depend_on_past": False,
-    "start_date": datetime(2021, 5, 1),
+    "start_date": datetime(2026, 9, 1),
     "email_on_failure": False,
     "email_on_retry": False,
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
 }
 
+AWS_ENV = {
+    "AWS_S3_PATH": os.environ["AWS_S3_PATH"],
+    "S3_USER": os.environ["S3_USER"],
+    "AWS_ACCESS_KEY_ID": os.environ["AWS_ACCESS_KEY_ID"],
+    "AWS_SECRET_ACCESS_KEY": os.environ["AWS_SECRET_ACCESS_KEY"],
+    "AWS_DEFAULT_REGION": os.environ["AWS_DEFAULT_REGION"],
+}
+
+params={
+    "tag": Param(
+        "python-polars",
+        type="string",
+        description="Stack Overflow tag to process",
+    )
+}
+
 with DAG(
-    "docker_operator_dag",
+    dag_id="capstone_llm",
     default_args=default_args,
-    schedule="5 * * * *",
+    params=params,
+    schedule=None,
     catchup=False,
 ) as dag:
-    start_dag = EmptyOperator(task_id="start_dag")
 
-    end_dag = EmptyOperator(task_id="end_dag")
-
-    t1 = BashOperator(task_id="print_current_date", bash_command="date")
-
-    t2 = DockerOperator(
-        task_id="docker_command_sleep",
-        image="docker_image_task",
-        container_name="task___command_sleep",
-        api_version="auto",
-        auto_remove="force",
-        command="/bin/sleep 30",
+    ingest = DockerOperator(
+        task_id="ingest",
+        image="capstone-llm",
+        command=[
+            "uv", "run", "python",
+            "-m", "capstonellm.tasks.ingest",
+            "--tag", "{{ params.tag }}",
+        ],
+        environment=AWS_ENV,
         docker_url="unix://var/run/docker.sock",
-        network_mode="bridge",
+        auto_remove="success",
     )
 
-    t3 = DockerOperator(
-        task_id="docker_command_hello",
-        image="docker_image_task",
-        container_name="task___command_hello",
-        api_version="auto",
-        auto_remove="force",
-        command="/bin/sleep 40",
+    clean = DockerOperator(
+        task_id="clean",
+        image="capstone-llm",
+        command=[
+            "uv", "run", "python",
+            "-m", "capstonellm.tasks.clean",
+            "--tag", "{{ params.tag }}",
+        ],
+        environment=AWS_ENV,
         docker_url="unix://var/run/docker.sock",
-        network_mode="bridge",
+        auto_remove="success",
     )
 
-    t4 = BashOperator(task_id="print_hello", bash_command='echo "hello world"')
-
-    start_dag >> t1
-
-    t1 >> t2 >> t4
-    t1 >> t3 >> t4
-
-    t4 >> end_dag
+    ingest >> clean
