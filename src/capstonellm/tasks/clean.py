@@ -45,14 +45,12 @@ def clean(session, env, tag):
 
     # read questions
     questions = (
-        session.read.json(questions_path)
+        session.read
+        .option("multiLine", True)
+        .json(questions_path)
         .select(explode("items").alias("question"))
         .select("question.*")
-        .select(
-            "question_id",
-            "title",
-            "body",
-        )
+        .select("question_id", "title", "body")
         .withColumnRenamed("body", "question_body")
     )
 
@@ -60,7 +58,9 @@ def clean(session, env, tag):
     # only those with non negative score
     # keep is_accepted flag to check 'best possible' answer
     answers = (
-        session.read.json(answers_path)
+        session.read
+        .option("multiLine", True)
+        .json(answers_path)
         .select(explode("items").alias("answer"))
         .select("answer.*")
         .filter("score >= 0")
