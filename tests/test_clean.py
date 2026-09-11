@@ -8,7 +8,7 @@ from capstonellm.common.catalog import llm_bucket
 
 @pytest.fixture
 def s3_path() -> str:
-    destination = "" # example: cleaned/jonas/python-polars
+    destination = "cleaned/Maria/python-polars" # example: cleaned/jonas/python-polars
 
     if not destination:
         raise Exception("TODO: specify the data destination in test_clean.py")
@@ -51,6 +51,23 @@ def test_s3_file_format(s3_path:str):
 
     data = json.loads(s3.get_object(Bucket=llm_bucket, Key=files[0])["Body"].read())
 
-    required_keys = ['question_id', 'question', 'title', 'link', 'answer_id', 'answer']
-    for key in required_keys:
-        assert key in data, f"Result .json file misses required key {key}"
+    required_question_keys = ['question_id', 'question_body', 'title', 'answers']
+    for key in required_question_keys:
+        assert key in data, (
+            f"Result .json file misses required key {key}"
+        )
+
+    assert isinstance(data["answers"], list)
+
+    required_answer_keys = [
+        "answer_id",
+        "answer_body",
+        "score",
+        "is_accepted",
+    ]
+
+    for answer in data["answers"]:
+        for key in required_answer_keys:
+            assert key in answer, (
+                f"Answer misses required key {key}"
+            )

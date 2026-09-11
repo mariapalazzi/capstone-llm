@@ -1,9 +1,9 @@
 docker:
     path: .
-id: f6f49228-b451-46e8-a27e-309862803fd0
+id: f4237f65-279f-4b3d-9e5c-23908742bd17
 ide:
     filename: ide.yaml
-name: capstone-test
+name: capstone-llm-maria
 resources:
     path: resources
 streaming:
